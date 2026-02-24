@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 from ..services.gmail_service import gmail_service
+from ..services.analysis_service import analysis_service
 from ..models.database import db
 
 router = APIRouter()
@@ -115,16 +116,24 @@ async def sync_emails(limit: int = 100):
         # Get recent messages
         messages = gmail_service.get_messages(max_results=limit)
         
-        # Store in database
+        # Store in database and analyze
         stored_count = 0
+        analyzed_count = 0
         for message in messages:
             message['user_id'] = user['id']
             if db.store_email(message):
                 stored_count += 1
-        
+                result = analysis_service.analyze_email(
+                    body_text=message.get('body_text', ''),
+                    subject=message.get('subject', ''),
+                )
+                if db.store_analysis(message['id'], result):
+                    analyzed_count += 1
+
         return {
             "success": True,
             "messages_synced": stored_count,
+            "messages_analyzed": analyzed_count,
             "total_messages": len(messages)
         }
         
