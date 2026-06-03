@@ -7,3 +7,4 @@ google-auth-httplib2==0.1.1
 google-api-python-client==2.108.0
 pydantic==2.5.0
 python-multipart==0.0.6
+textblob==0.18.0

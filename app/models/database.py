@@ -48,7 +48,7 @@ class DatabaseManager:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS email_analysis (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email_id TEXT,
+                email_id TEXT UNIQUE,
                 sentiment_score REAL,
                 sentiment_label TEXT,
                 keywords TEXT,
@@ -136,6 +136,59 @@ class DatabaseManager:
         finally:
             conn.close()
     
+    def store_analysis(self, email_id: str, analysis_data: dict) -> bool:
+        """Store email analysis results"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT OR REPLACE INTO email_analysis (
+                    email_id, sentiment_score, sentiment_label,
+                    keywords, communication_style, urgency_level
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                email_id,
+                analysis_data.get('sentiment_score'),
+                analysis_data.get('sentiment_label'),
+                analysis_data.get('keywords'),
+                analysis_data.get('communication_style'),
+                analysis_data.get('urgency_level'),
+            ))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error storing analysis: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def get_email_analysis(self, user_id: int, limit: int = 1000) -> list:
+        """Get analysis results for a user's emails"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT ea.email_id, ea.sentiment_score, ea.sentiment_label,
+                   ea.keywords, ea.communication_style, ea.urgency_level
+            FROM email_analysis ea
+            JOIN emails e ON ea.email_id = e.id
+            WHERE e.user_id = ?
+            ORDER BY ea.analyzed_at DESC
+            LIMIT ?
+        ''', (user_id, limit))
+        results = cursor.fetchall()
+        conn.close()
+        return [
+            {
+                'email_id': row[0],
+                'sentiment_score': row[1],
+                'sentiment_label': row[2],
+                'keywords': row[3],
+                'communication_style': row[4],
+                'urgency_level': row[5],
+            }
+            for row in results
+        ]
+
     def get_user_emails(self, user_id: int, limit: int = 100) -> list:
         """Get emails for a user"""
         conn = self.get_connection()
